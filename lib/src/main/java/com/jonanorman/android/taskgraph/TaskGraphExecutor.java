@@ -124,6 +124,7 @@ public class TaskGraphExecutor {
 
         private void initTaskGraph() {
             directGraph = taskGraph.generateDirectGraph();
+            TaskGraphModule.logInfo("graphPic:\n"+directGraph.getGraphPic());
             vertexSet = directGraph.getVertexSet();
             TaskGraphModule.logInfo("task count " + vertexSet.size());
             if (directGraph.hasCycle()) {

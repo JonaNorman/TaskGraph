@@ -365,6 +365,26 @@ class DirectedGraph<V> implements Cloneable {
     }
 
 
+    public String getGraphPic() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("digraph pic {\n");
+        for (Vertex<V> vertex : getVertexSet()) {
+            V value = vertex.getValue();
+            builder.append(value + ";\n");
+        }
+        for (Vertex<V> vertex : getVertexSet()) {
+            Set<Edge<V>> edges = getOutgoingEdgeSet(vertex);
+            if (edges != null) {
+                for (Edge<V> edge : edges) {
+                    builder.append(edge.from.value + " -> " + edge.to.value + ";\n");
+                }
+            }
+
+        }
+        builder.append("}\n");
+        return builder.toString();
+    }
+
     @Override
     protected Object clone() throws CloneNotSupportedException {
         DirectedGraph clone = (DirectedGraph) super.clone();

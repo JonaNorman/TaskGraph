@@ -59,7 +59,7 @@ public class Task implements Runnable, Cloneable {
 
     @Override
     public String toString() {
-        return "Task" + (TextUtils.isEmpty(name) ? taskRunnable : name);
+        return TextUtils.isEmpty(name) ? taskRunnable.getClass().getName() : name;
     }
 
 

@@ -59,7 +59,7 @@ public class TaskGraph {
         }
     }
 
-    public DirectedGraph generateDirectGraph() {
+    public DirectedGraph generateDirectedGraph() {
         long startTime = System.currentTimeMillis();
         DirectedGraph directedGraph = new DirectedGraph();
         Map<Task, DirectedGraph.Vertex<Task>> taskMap = new HashMap<>();

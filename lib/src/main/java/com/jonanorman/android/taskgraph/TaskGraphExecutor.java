@@ -123,12 +123,16 @@ public class TaskGraphExecutor {
 
 
         private void initTaskGraph() {
-            directGraph = taskGraph.generateDirectGraph();
-            TaskGraphModule.logInfo("graphPic:\n"+directGraph.getGraphPic());
+            long startTime =System.currentTimeMillis();
+            directGraph = taskGraph.generateDirectedGraph();
+            TaskGraphModule.logDebug("generateDirectedGraph take time " + (System.currentTimeMillis()-startTime)+"ms");
+            if (TaskGraphModule.isLogGraphViz()){
+                TaskGraphModule.logInfo("graphPic:\n"+directGraph.getGraphPic());
+            }
             vertexSet = directGraph.getVertexSet();
-            TaskGraphModule.logInfo("task count " + vertexSet.size());
+            TaskGraphModule.logDebug("task count " + vertexSet.size());
             if (directGraph.hasCycle()) {
-                throw new IllegalStateException("graph has cycle " + directGraph);
+                throw new IllegalStateException("graph has cycle\n " + directGraph.getGraphPic());
             }
         }
 

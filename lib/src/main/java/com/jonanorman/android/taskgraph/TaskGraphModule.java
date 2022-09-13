@@ -26,12 +26,14 @@ public class TaskGraphModule {
     private static Object PACKAGE_NAME_SYNC = new Object();
     private static Object LOG_FUNCTION_SYNC = new Object();
     private static Object ENABLE_TRACE_SYNC = new Object();
+    private static Object LOG_GRAPH_VIZ_SYNC = new Object();
     private static String PROCESS_NAME;
     private static Boolean MAIN_PROCESS;
     private static String PACKAGE_NAME;
     private static volatile Application APP_CONTEXT;
 
     private static boolean ENABLE_TRACE = true;
+    private static boolean LOG_GRAPH_VIZ = true;
 
     private static final LogFunction DEFAULT_LOG_FUNCTION = new LogFunction(TAG) {
 
@@ -139,6 +141,19 @@ public class TaskGraphModule {
             }
             PACKAGE_NAME = getApplication().getPackageName();
             return PACKAGE_NAME;
+        }
+    }
+
+    public static void setLogGraphViz(boolean logGraphViz) {
+        synchronized (LOG_GRAPH_VIZ_SYNC) {
+            LOG_GRAPH_VIZ = logGraphViz;
+        }
+
+    }
+
+    public static boolean isLogGraphViz() {
+        synchronized (LOG_GRAPH_VIZ_SYNC) {
+            return LOG_GRAPH_VIZ;
         }
     }
 

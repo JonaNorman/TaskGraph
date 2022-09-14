@@ -42,8 +42,7 @@ TaskGraphExecutor.getDefault().execute(graphBuilder);
 
 ### Log
 
-默认的日志Tag是TASK_GRAPH_LOG，搜索TASK_GRAPH_LOG: graphviz:会输出任务的graphviz的有向图日志，复制到 [graphviz-visual-editor](http://magjac.com/graphviz-visual-editor/) 可视化查看
-
+The default log tag is TASK_GRAPH_LOG, search for TASK_GRAPH_LOG: graphviz: will output the directed graph log of the task's graphviz, copy it to [graphviz-visual-editor](http://magjac.com/graphviz-visual-editor/) Visual view
 ![img.png](screen/img.png)
 
 ### trace
@@ -51,8 +50,8 @@ TaskGraphExecutor.getDefault().execute(graphBuilder);
 ```shell
 python systrace.py -o trace.html  -a packagename sched
 ```
-packagename要替换成运行的app的包名
-chrome浏览器打开chrome://tracing/,load 按钮加载trace.html
+packagename should be replaced with the package name of the running app
+Chrome browser open chrome://tracing/, load button to load trace.html
 ![img.png](screen/img2.png)
 
 
@@ -94,13 +93,24 @@ chrome浏览器打开chrome://tracing/,load 按钮加载trace.html
 - **setFirstTask**
 
     Set the first task, which can be passed or not
-- **setLastTask** 设置最后一个任务，可传可不传
-- **clearTask** 清空任务
-- **addTaskGraphCallback** 添加任务图回调
-- **removeTaskGraphCallback** 移除任务图回调
-- **clearTaskGraphCallback** 清空任务图回调
-- **execute** 执行，用TaskGraphExecutor.getDefault()执行，也可以new TaskGraphExecutor()来执行
+- **setLastTask** 
 
+  Set the last task, which can be passed or not
+- **clearTask**
+
+  clear task
+- **addTaskGraphCallback** 
+
+  Add task graph callback
+- **removeTaskGraphCallback** 
+
+  remove task graph callback
+- **clearTaskGraphCallback**
+
+  Clear task graph callback
+- **execute** 
+
+  Execute, use TaskGraphExecutor.getDefault() to execute, or new TaskGraphExecutor() to execute
 ### TaskGraphExecutor
 
 - **getDefault** 

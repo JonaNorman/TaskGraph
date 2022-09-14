@@ -103,11 +103,11 @@ public class TaskGraphExecutor {
 
         private void logStart() {
             startTime = System.currentTimeMillis();
-            TaskGraphModule.logVerbose("task graph start");
+            TaskGraphModule.logVerbose("taskGraph start...");
         }
 
         private void logEnd() {
-            TaskGraphModule.logDebug("task graph end " + (System.currentTimeMillis() - startTime) + " ms");
+            TaskGraphModule.logDebug("taskGraph end " + (System.currentTimeMillis() - startTime) + " ms");
         }
 
         private String getCurrentThreadMessage() {
@@ -123,14 +123,12 @@ public class TaskGraphExecutor {
 
 
         private void initTaskGraph() {
-            long startTime =System.currentTimeMillis();
             directGraph = taskGraph.generateDirectedGraph();
-            TaskGraphModule.logDebug("generateDirectedGraph take time " + (System.currentTimeMillis()-startTime)+"ms");
             if (TaskGraphModule.isLogGraphViz()){
                 TaskGraphModule.logInfo("graphPic:\n"+directGraph.getGraphPic());
             }
             vertexSet = directGraph.getVertexSet();
-            TaskGraphModule.logDebug("task count " + vertexSet.size());
+            TaskGraphModule.logDebug("taskGraph has " + vertexSet.size()+" task");
             if (directGraph.hasCycle()) {
                 throw new IllegalStateException("graph has cycle\n " + directGraph.getGraphPic());
             }

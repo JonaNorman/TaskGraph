@@ -161,7 +161,7 @@ public class TaskGraph {
                 directedGraph.addEdge(new DirectedGraph.Edge(from, lastVertex));
             }
         }
-        TaskGraphModule.logDebug("generateDirectGraph take time " + (System.currentTimeMillis() - startTime) + "ms");
+        TaskGraphModule.logDebug("taskGraph generate take time " + (System.currentTimeMillis() - startTime) + "ms");
         return directedGraph;
     }
 

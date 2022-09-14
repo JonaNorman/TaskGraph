@@ -125,7 +125,7 @@ public class TaskGraphExecutor {
         private void initTaskGraph() {
             directGraph = taskGraph.generateDirectedGraph();
             if (TaskGraphModule.isLogGraphViz()){
-                TaskGraphModule.logInfo("graphPic:\n"+directGraph.getGraphPic());
+                TaskGraphModule.logInfo("graphviz:\n"+directGraph.getGraphPic());
             }
             vertexSet = directGraph.getVertexSet();
             TaskGraphModule.logDebug("taskGraph has " + vertexSet.size()+" task");

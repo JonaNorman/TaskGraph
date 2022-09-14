@@ -81,7 +81,7 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("F").dependsOn("C"));
+        }).setName("F").dependsOn("C").setMainThread(true));
 
         graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override

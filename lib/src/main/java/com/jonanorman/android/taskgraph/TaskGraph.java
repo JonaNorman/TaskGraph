@@ -198,7 +198,7 @@ public class TaskGraph {
             return this;
         }
 
-        public Builder clearTask(Task.Builder builder) {
+        public Builder clearTask() {
             taskBuilderSet.clear();
             return this;
         }

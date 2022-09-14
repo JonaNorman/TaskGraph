@@ -137,6 +137,10 @@ public class Task implements Runnable, Cloneable {
             this(null, runnable, mainThread, true);
         }
 
+        public Builder(String name,Runnable runnable) {
+            this(null, runnable, false, true);
+        }
+
 
         public Builder(String name, Runnable runnable, boolean mainThread, boolean onlyMainProcess) {
             this.name = name;

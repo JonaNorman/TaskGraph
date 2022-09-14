@@ -13,8 +13,8 @@ public class DemoApp extends Application {
     public void onCreate() {
         super.onCreate();
         TaskGraphModule.initApplication(this);
-        TaskGraph.Builder taskGraphBuilder = new TaskGraph.Builder();
-        taskGraphBuilder.addTask(new Task.Builder(new Runnable() {
+        TaskGraph.Builder graphBuilder = new TaskGraph.Builder();
+        graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -25,7 +25,7 @@ public class DemoApp extends Application {
             }
         }).setName("A"));
 
-        taskGraphBuilder.addTask(new Task.Builder(new Runnable() {
+        graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -36,7 +36,7 @@ public class DemoApp extends Application {
             }
         }).setName("B"));
 
-        taskGraphBuilder.addTask(new Task.Builder(new Runnable() {
+        graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -47,7 +47,7 @@ public class DemoApp extends Application {
             }
         }).setName("C").dependsOn("D").dependsOn("B"));
 
-        taskGraphBuilder.addTask(new Task.Builder(new Runnable() {
+        graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
 
@@ -59,7 +59,7 @@ public class DemoApp extends Application {
             }
         }).setName("D").dependsOn("A"));
 
-        taskGraphBuilder.addTask(new Task.Builder(new Runnable() {
+        graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
 
@@ -71,7 +71,7 @@ public class DemoApp extends Application {
             }
         }).setName("E").dependsOn("F"));
 
-        taskGraphBuilder.addTask(new Task.Builder(new Runnable() {
+        graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
 
@@ -83,7 +83,7 @@ public class DemoApp extends Application {
             }
         }).setName("F").dependsOn("C"));
 
-        taskGraphBuilder.addTask(new Task.Builder(new Runnable() {
+        graphBuilder.addTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
 
@@ -95,7 +95,7 @@ public class DemoApp extends Application {
             }
         }).setName("G").dependsOn("C"));
 
-        taskGraphBuilder.setFirstTask(new Task.Builder(new Runnable() {
+        graphBuilder.setFirstTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -106,7 +106,7 @@ public class DemoApp extends Application {
             }
         }, true).setName("first"));
 
-        taskGraphBuilder.setLastTask(new Task.Builder(new Runnable() {
+        graphBuilder.setLastTask(new Task.Builder(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -116,6 +116,6 @@ public class DemoApp extends Application {
                 }
             }
         }).setName("last"));
-        taskGraphBuilder.execute();
+        graphBuilder.execute();
     }
 }

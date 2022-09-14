@@ -1,3 +1,2 @@
 include ':sample'
 include ':lib'
-rootProject.name = "TaskGraph"

@@ -6,6 +6,9 @@ English | [简体中文](./README.md)
 
 This is a dependency task startup framework for Android development, dedicated to helping Android developers reduce development costs, and it can be used in startup optimization.
 
+**Ps:**
+
+This English document is translated by google, if you don't understand it, you can submit an issue to me.
 ## Import
 
 [![Maven Central](http://maven-badges.herokuapp.com/maven-central/io.github.jonanorman.android/taskgraph/badge.svg
@@ -17,6 +20,7 @@ implementation('io.github.jonanorman.android:taskgraph:0.1.0')
 
 ## Use
 ### Init
+It must be executed in onCreate of Application, otherwise TaskGraphModule.getTopActivity() will be wrong
 
 ```Java
 TaskGraphModule.initApplication(appliction);
@@ -25,18 +29,23 @@ TaskGraphModule.initApplication(appliction);
 ### Execute
 
 ```Java
-TaskGraph.Builder graphBuilder = new TaskGraph.Builder();
-graphBuilder.addTask(new Task.Builder("A",new Runnable() {
-    @Override
-    public void run() {
-    }
-}));
-graphBuilder.addTask(new Task.Builder("B",new Runnable() {
-    @Override
-    public void run() {
-    }
-}).dependsOn("A").setMainThread(true));
-TaskGraphExecutor.getDefault().execute(graphBuilder);
+TaskGraph taskGraph = new TaskGraph();
+        taskGraph.addTask(new Task("A",new Runnable() {//添加A任务
+@Override
+public void run() {
+        }
+        }).addTaskInterceptor(new Task.TaskInterceptor() {
+@Override
+public void onIntercept(Task.TaskInterceptorChain interceptorChain) {//拦截A任务，在A任务之前可以插入交互性的任务
+        interceptorChain.proceed();
+        }
+        }));
+        taskGraph.addTask(new Task("B",new Runnable() {
+@Override
+public void run() {//添加B任务,B任务依赖A任务先完成
+        }
+        }).dependsOn("A").setMainThread(true));
+        TaskGraphExecutor.getDefault().execute(taskGraph);
 ```
 
 
@@ -56,106 +65,129 @@ Chrome browser open chrome://tracing/, load button to load trace.html
 
 
 ## DOC
-### Task.Builder
+### Task
+Pass in runnable in the constructor or override the run method of the Task
+- **setName**
+
+  Set the task name, which can be passed or not. If it is not passed, the default is to use Task-Num as the name.
+- **setMainThread**
+
+  Set whether to run in the main thread, default false
 - **setOnlyMainProcess**
 
-  Whether to run only in the main process, the default is true
-- **setRunnable**
+  Whether to run only in the main process default true
+- **addTaskListener**
 
-  The runnables of tasks in each TaskGraph cannot be the same, and the same will be overwritten
-- **setName** 
-
-  Set the task name, which can be passed or not. If not passed, the class of runnable is used as the name in the log.
-- **addTaskCallback**
-
-  set task callback
-- **removeTaskCallback**
+  Set the task callback. The doFirst of TaskListener indicates that the task is executed before and after the interception task continues to execute, and doLast indicates that the task is executed after the successful execution.
+- **removeTaskInterceptor**
 
   remove task callback
-- **clearTaskCallback**
+- **clearTaskInterceptor**
 
   clear task callback
 - **dependsOn**
 
-  Dependent tasks, assuming that A needs to be executed after B is executed, then A.dependsOn(B), which can pass String, Builder, runnable and their arrays
-- **clearDependsOn** 
+  Depends on tasks, assuming that B needs to be executed before A can be executed, then B.dependsOn(A), which can pass String, Task and their arrays
+- **clearDepends**
 
-   Clear dependencies
+  Clear dependencies
+- **addTaskInterceptor**
 
-### TaskGraph.Builder
+  Add a task interceptor, the onIntercept of TaskInterceptor is executed before the execution of the task, and the cancel method of TaskInterceptorChain is called to cancel the task, then all unexecuted tasks are canceled, and the proceed method of TaskInterceptorChain is called to indicate continued execution, and one of them must be executed, otherwise it will always waiting
+- **removeTaskInterceptor**
 
-- **addTask** 
+  remove task interceptor
 
-    Add a task, pass in the Task.Builder object
-- **removeTask** 
+### TaskGraph
 
-    remove task
+- **addTask**
+
+  add task
+- **removeTask**
+
+  remove task
 - **setFirstTask**
 
-    Set the first task, which can be passed or not
-- **setLastTask** 
+  Set the first task, which can be passed or not
+- **setLastTask**
 
   Set the last task, which can be passed or not
 - **clearTask**
 
-  clear task
-- **addTaskGraphCallback** 
+  Clear tasks without clearing FirstTask and LastTask
+- **addTaskGraphListener**
 
-  Add task graph callback
-- **removeTaskGraphCallback** 
+  Add task graph callback, onTaskGraphStart of TaskGraphListener means to execute before all tasks are executed, onTaskGraphEnd means to execute after all tasks are executed successfully, onTaskGraphCancel means to execute after task execution is canceled
+- **removeTaskGraphListener**
 
   remove task graph callback
-- **clearTaskGraphCallback**
+- **clearTaskGraphListener**
 
   Clear task graph callback
-- **execute** 
+- **execute**
 
   Execute, use TaskGraphExecutor.getDefault() to execute, or new TaskGraphExecutor() to execute
 ### TaskGraphExecutor
-
-- **getDefault** 
+- **getDefault**
 
   default executor
-- **setCoreThreadPoolSize** 
+- **setCoreThreadPoolSize**
 
   Set the number of thread pool cores
-- **setMaximumPoolSize** 
+- **setMaximumPoolSize**
 
   Set the maximum number of thread pools
-- **getThreadPoolExecutor** 
+- **getThreadPoolExecutor**
 
   get thread pool
 - **execute**
 
-  Pass in the TaskGraph.Builder object to execute
+  Pass in the TaskGraph object for execution. If the TaskGraph object changes during execution, the original object settings will still be executed to ensure execution reliability.
 
 ### TaskGraphModule
-
-- **isMainProcess** 
+module setter
+- **isMainProcess**
 
   Is it the main process
-- **getProcessName** 
+- **isMainThread**
+
+  Is it the main thread
+- **getProcessName**
 
   get process name
-- **getApplication** 
+- **getApplication**
 
   Get Application
-- **initApplication** 
+- **initApplication**
 
   Initialization, called in Application's onCreate
-- **setLogFunction** 
+- **setLogFunction**
 
-  Initialization, called in Application's onCreate
-- **setEnableTrace** 
+  Set LogFunction
+- **setEnableTrace**
 
   Whether to enable Systrace tracing, enabled by default
-- **getPackageName** 
+- **getPackageName**
 
   get package name
-- **setLogGraphViz** 
+- **setLogGraphViz**
 
   Whether to enable the output of GraphViz directed graph logs, enabled by default
+- **getTopActivity**
 
+  Get the current topmost Activity
+- **runInMainThread**
+
+  Execute in the main thread, if the current thread is the main thread, execute immediately
+- **addTopActivityListener**
+
+  Add a listener to listen for changes in the top activity
+- **removeTopActivityListener**
+
+  remove listener
+- **getRecentActivity**
+
+  Get the latest activity, if it already exists, call back directly in the main thread, if not, wait until there is an activity to return
 
 ## License
 

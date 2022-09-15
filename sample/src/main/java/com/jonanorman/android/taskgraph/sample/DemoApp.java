@@ -1,20 +1,30 @@
 package com.jonanorman.android.taskgraph.sample;
 
+import android.app.Activity;
 import android.app.Application;
+import android.content.DialogInterface;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
 
 import com.jonanorman.android.taskgraph.Task;
+import com.jonanorman.android.taskgraph.TaskCancelException;
 import com.jonanorman.android.taskgraph.TaskGraph;
+import com.jonanorman.android.taskgraph.TaskGraphExecutor;
 import com.jonanorman.android.taskgraph.TaskGraphModule;
+
+import java.util.concurrent.TimeUnit;
 
 
 public class DemoApp extends Application {
+
 
     @Override
     public void onCreate() {
         super.onCreate();
         TaskGraphModule.initApplication(this);
-        TaskGraph.Builder graphBuilder = new TaskGraph.Builder();
-        graphBuilder.addTask(new Task.Builder(new Runnable() {
+        TaskGraph taskGraph = new TaskGraph();
+        taskGraph.addTask(new Task("A", new Runnable() {
             @Override
             public void run() {
                 try {
@@ -23,9 +33,9 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("A"));
+        }));
 
-        graphBuilder.addTask(new Task.Builder(new Runnable() {
+        taskGraph.addTask(new Task("B", new Runnable() {
             @Override
             public void run() {
                 try {
@@ -34,9 +44,9 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("B"));
+        }));
 
-        graphBuilder.addTask(new Task.Builder(new Runnable() {
+        taskGraph.addTask(new Task("C", new Runnable() {
             @Override
             public void run() {
                 try {
@@ -45,9 +55,9 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("C").dependsOn("D").dependsOn("B"));
+        }).dependsOn("D", "B"));
 
-        graphBuilder.addTask(new Task.Builder(new Runnable() {
+        taskGraph.addTask(new Task("D", new Runnable() {
             @Override
             public void run() {
 
@@ -57,9 +67,20 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("D").dependsOn("A"));
+        }).dependsOn("A").addTaskInterceptor(new Task.TaskInterceptor() {
 
-        graphBuilder.addTask(new Task.Builder(new Runnable() {
+            @Override
+            public void onIntercept(Task.TaskInterceptorChain interceptorChain) {
+                TaskGraphModule.getRecentActivity(new TaskGraphModule.RecentActivityListener() {
+                    @Override
+                    public void onRecentActivity(Activity activity) {
+                        showDialog("D Task", activity, interceptorChain);
+                    }
+                });
+            }
+        }));
+
+        taskGraph.addTask(new Task("E", new Runnable() {
             @Override
             public void run() {
 
@@ -69,9 +90,9 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("E").dependsOn("F"));
+        }).dependsOn("F"));
 
-        graphBuilder.addTask(new Task.Builder(new Runnable() {
+        taskGraph.addTask(new Task("F", new Runnable() {
             @Override
             public void run() {
 
@@ -81,9 +102,9 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("F").dependsOn("C").setMainThread(true));
+        }).dependsOn("C").setMainThread(true));
 
-        graphBuilder.addTask(new Task.Builder(new Runnable() {
+        taskGraph.addTask(new Task("G", new Runnable() {
             @Override
             public void run() {
 
@@ -93,9 +114,9 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("G").dependsOn("C"));
+        }).dependsOn("C"));
 
-        graphBuilder.setFirstTask(new Task.Builder(new Runnable() {
+        taskGraph.setFirstTask(new Task("first", new Runnable() {
             @Override
             public void run() {
                 try {
@@ -104,9 +125,19 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }, true).setName("first"));
+        }).addTaskInterceptor(new Task.TaskInterceptor() {
 
-        graphBuilder.setLastTask(new Task.Builder(new Runnable() {
+            @Override
+            public void onIntercept(Task.TaskInterceptorChain interceptorChain) {
+                TaskGraphModule.getRecentActivity(new TaskGraphModule.RecentActivityListener() {
+                    @Override
+                    public void onRecentActivity(Activity activity) {
+                        showDialog("first Task", activity, interceptorChain);
+                    }
+                });
+            }
+        }));
+        taskGraph.setLastTask(new Task("last", new Runnable() {
             @Override
             public void run() {
                 try {
@@ -115,7 +146,54 @@ public class DemoApp extends Application {
                     e.printStackTrace();
                 }
             }
-        }).setName("last"));
-        graphBuilder.execute();
+        }));
+        taskGraph.addTaskGraphListener(new TaskGraph.TaskGraphListener() {
+            @Override
+            public void onTaskGraphStart(TaskGraph taskGraph) {
+
+            }
+
+            @Override
+            public void onTaskGraphEnd(TaskGraph taskGraph, long time, TimeUnit timeUnit) {
+                TaskGraphModule.runInMainThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(TaskGraphModule.getApplication(), "finished all task, cost time "+timeUnit.toMillis(time)+" ms", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+
+            @Override
+            public void onTaskGraphCancel(TaskGraph taskGraph, TaskCancelException cancelException) {
+                TaskGraphModule.runInMainThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(TaskGraphModule.getApplication(), "taskGraph canceled by " + cancelException.getTask().getName() + " task", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+        taskGraph.execute();
+    }
+
+
+    private void showDialog(String title, Activity activity, Task.TaskInterceptorChain interceptorChain) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        builder.setPositiveButton("ok", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                interceptorChain.proceed();
+            }
+        });
+        builder.setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                interceptorChain.cancel();
+            }
+        });
+        builder.setTitle(title);
+        builder.setMessage("Please click ok  to continue");
+        builder.setCancelable(false);
+        builder.show();
     }
 }

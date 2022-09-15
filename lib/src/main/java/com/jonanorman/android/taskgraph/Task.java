@@ -1,261 +1,192 @@
 package com.jonanorman.android.taskgraph;
 
-import android.text.TextUtils;
-
 import java.util.HashSet;
-import java.util.Objects;
+import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
-public class Task implements Runnable, Cloneable {
+public class Task implements Cloneable, Runnable {
+    private static AtomicLong TASK_INIT_NUMBER = new AtomicLong();
 
-    private Runnable taskRunnable;
-    private Set<TaskCallback> callbackSet;
-    private boolean mainThread;
-    private boolean onlyMainProcess;
-    private String name;
-    private Set<Object> dependsOnSet;
+    final Set<TaskListener> listenerSet;
+    final Set<TaskInterceptor> taskInterceptorSet;
+    final Set<Object> dependsSet;
+    boolean mainThread;
+    boolean onlyMainProcess;
+    String name;
+    Runnable runnable;
 
+    public Task() {
+        this((String) null);
+    }
 
-    Task(Builder builder) {
-        this.name = builder.name;
-        this.taskRunnable = builder.taskRunnable;
-        this.mainThread = builder.mainThread;
-        this.onlyMainProcess = builder.onlyMainProcess;
-        this.callbackSet = new HashSet<>();
-        this.callbackSet.addAll(builder.callbackSet);
-        this.dependsOnSet = new HashSet<>();
-        for (Object dependsOn : builder.dependsOnSet) {
-            dependsOnSet.add(dependsOn);
+    public Task(String name) {
+        this(name, null);
+    }
+
+    public Task(Runnable runnable) {
+        this(null, runnable);
+    }
+
+    public Task(String name, Runnable runnable) {
+        this(name, runnable, false, true);
+    }
+
+    public Task(String name, Runnable runnable, boolean mainThread, boolean onlyMainProcess) {
+        if (name == null) {
+            name = "Task-" + TASK_INIT_NUMBER.incrementAndGet();
         }
+        this.runnable = runnable;
+        this.name = name;
+        this.mainThread = mainThread;
+        this.onlyMainProcess = onlyMainProcess;
+        this.listenerSet = new HashSet<>();
+        this.dependsSet = new HashSet<>();
+        this.taskInterceptorSet = new LinkedHashSet<>();
     }
 
-    public final void run() {
-        try {
-            for (TaskCallback taskCallback : callbackSet) {
-                taskCallback.doFirst(this);
-            }
-            taskRunnable.run();
-        } finally {
-            for (TaskCallback taskCallback : callbackSet) {
-                taskCallback.doLast(this);
-            }
-        }
-
+    public Task(Task task) {
+        this((Runnable) null, task);
     }
 
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Task)) return false;
-        Task task = (Task) o;
-        return Objects.equals(taskRunnable, task.taskRunnable);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(taskRunnable);
-    }
-
-    @Override
-    public String toString() {
-        return TextUtils.isEmpty(name) ? taskRunnable.getClass().getName() : name;
+    public Task(Runnable runnable, Task task) {
+        this.dependsSet = new HashSet<>();
+        this.dependsSet.addAll(task.dependsSet);
+        this.mainThread = task.mainThread;
+        this.onlyMainProcess = task.onlyMainProcess;
+        this.runnable = runnable;
+        this.listenerSet = new HashSet<>();
+        this.listenerSet.addAll(task.listenerSet);
+        this.taskInterceptorSet = new HashSet<>();
+        this.taskInterceptorSet.addAll(task.taskInterceptorSet);
     }
 
 
-    @Override
-    protected Object clone() throws CloneNotSupportedException {
-        Task clone = (Task) super.clone();
-        clone.taskRunnable = taskRunnable;
-        clone.dependsOnSet = new HashSet<>();
-        for (Object depend : dependsOnSet) {
-            clone.dependsOnSet.add(depend);
-        }
-        clone.name = name;
-        clone.mainThread = mainThread;
-        clone.onlyMainProcess = onlyMainProcess;
-        clone.callbackSet = new HashSet<>();
-        for (TaskCallback taskCallback : callbackSet) {
-            clone.callbackSet.add(taskCallback);
-        }
-        return clone;
+    public boolean isMainThread() {
+        return mainThread;
     }
 
-    void addTaskCallback(TaskCallback taskcallback) {
-        callbackSet.add(taskcallback);
+    public Task setMainThread(boolean mainThread) {
+        this.mainThread = mainThread;
+        return this;
     }
-
 
     public boolean isOnlyMainProcess() {
         return onlyMainProcess;
     }
 
-    public boolean isMainThread() {
-        return mainThread;
+    public Task setOnlyMainProcess(boolean onlyMainProcess) {
+        this.onlyMainProcess = onlyMainProcess;
+        return this;
+    }
+
+    public Task setName(String name) {
+        this.name = name;
+        return this;
     }
 
     public String getName() {
         return name;
     }
 
-    public Runnable getTaskRunnable() {
-        return taskRunnable;
+    public Task addTaskListener(TaskListener taskListener) {
+        listenerSet.add(taskListener);
+        return this;
     }
 
-    public Set<Object> getDependsOnSet() {
-        return dependsOnSet;
+    public Task removeTaskListener(TaskListener taskListener) {
+        listenerSet.add(taskListener);
+        return this;
     }
 
-    public interface TaskCallback {
+    public Task clearTaskListener() {
+        listenerSet.clear();
+        return this;
+    }
+
+    public Task dependsOn(String name) {
+        dependsSet.add(name);
+        return this;
+    }
+
+    public Task dependsOn(Task task) {
+        dependsSet.add(task);
+        return this;
+    }
+
+
+    @Override
+    public boolean equals(Object that) {
+        if (this == that) return true;
+        if (!(that instanceof Task)) return false;
+        Task task = (Task) that;
+        return task != that;
+    }
+
+
+    public Task dependsOn(String... names) {
+        for (String name : names) {
+            dependsSet.add(name);
+        }
+        return this;
+    }
+
+    public Task dependsOn(Task... tasks) {
+        for (Task task : tasks) {
+            dependsSet.add(task);
+        }
+        return this;
+    }
+
+
+    public Task clearDepends() {
+        dependsSet.clear();
+        return this;
+    }
+
+    public Task addTaskInterceptor(TaskInterceptor taskInterceptor) {
+        taskInterceptorSet.add(taskInterceptor);
+        return this;
+    }
+
+    public Task removeTaskInterceptor(TaskInterceptor taskInterceptor) {
+        taskInterceptorSet.add(taskInterceptor);
+        return this;
+    }
+
+    public Task clearTaskInterceptor() {
+        taskInterceptorSet.clear();
+        return this;
+    }
+
+    @Override
+    public void run() {
+        if (runnable != null) {
+            runnable.run();
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "Task " + name + " [mainThread: " + mainThread + "onlyMainProcess: " + onlyMainProcess + "]";
+    }
+
+    public interface TaskListener {
 
         void doFirst(Task task);
 
-        void doLast(Task task);
+        void doLast(Task task, long time, TimeUnit timeUnit);
     }
 
-    public static class Builder implements Cloneable {
-        private boolean mainThread;
-        private boolean onlyMainProcess;
-        private Runnable taskRunnable;
-        private Set<TaskCallback> callbackSet;
-        private Set<Object> dependsOnSet;
-        private String name;
+    public interface TaskInterceptor {
 
-        public Builder() {
-            this(null, null, false, true);
-        }
-
-        public Builder(String name) {
-            this(name, null, false, true);
-        }
-
-        public Builder(Runnable runnable) {
-            this(runnable, false);
-        }
-
-        public Builder(Runnable runnable, boolean mainThread) {
-            this(null, runnable, mainThread, true);
-        }
-
-        public Builder(String name,Runnable runnable) {
-            this(null, runnable, false, true);
-        }
-
-
-        public Builder(String name, Runnable runnable, boolean mainThread, boolean onlyMainProcess) {
-            this.name = name;
-            this.taskRunnable = runnable;
-            this.mainThread = mainThread;
-            this.onlyMainProcess = onlyMainProcess;
-            callbackSet = new HashSet<>();
-            dependsOnSet = new HashSet<>();
-        }
-
-        public boolean isMainThread() {
-            return mainThread;
-        }
-
-        public Builder setMainThread(boolean mainThread) {
-            this.mainThread = mainThread;
-            return this;
-        }
-
-        public boolean isOnlyMainProcess() {
-            return onlyMainProcess;
-        }
-
-        public Builder setOnlyMainProcess(boolean onlyMainProcess) {
-            this.onlyMainProcess = onlyMainProcess;
-            return this;
-        }
-
-        public void setRunnable(Runnable taskRunnable) {
-            this.taskRunnable = taskRunnable;
-        }
-
-        public Builder setName(String name) {
-            this.name = name;
-            return this;
-        }
-
-        public Builder addTaskCallback(TaskCallback taskcallback) {
-            callbackSet.add(taskcallback);
-            return this;
-        }
-
-        public Builder removeTaskCallback(TaskCallback taskcallback) {
-            callbackSet.add(taskcallback);
-            return this;
-        }
-
-        public Builder clearTaskCallback() {
-            callbackSet.clear();
-            return this;
-        }
-
-        public Builder dependsOn(String name) {
-            dependsOnSet.add(name);
-            return this;
-        }
-
-        public Builder dependsOn(Builder builder) {
-            dependsOnSet.add(builder.taskRunnable);
-            return this;
-        }
-
-        public Builder dependsOn(Runnable taskRunnable) {
-            dependsOnSet.add(taskRunnable);
-            return this;
-        }
-
-
-        public Builder dependsOn(String... name) {
-            dependsOnSet.add(name);
-            return this;
-        }
-
-        public Builder dependsOn(Builder... builder) {
-            for (Builder b : builder) {
-                dependsOnSet.add(b.taskRunnable);
-            }
-            return this;
-        }
-
-        public Builder dependsOn(Runnable... taskRunnable) {
-            dependsOnSet.add(taskRunnable);
-            return this;
-        }
-
-
-        public Builder clearDependsOn() {
-            dependsOnSet.clear();
-            return this;
-        }
-
-
-        @Override
-        public Builder clone() throws CloneNotSupportedException {
-            Builder clone = (Builder) super.clone();
-            clone.taskRunnable = taskRunnable;
-            clone.dependsOnSet = new HashSet<>();
-            for (Object object : dependsOnSet) {
-                clone.dependsOnSet.add(object);
-            }
-            clone.mainThread = mainThread;
-            clone.onlyMainProcess = onlyMainProcess;
-            clone.callbackSet = new HashSet<>();
-            for (TaskCallback taskCallback : callbackSet) {
-                clone.callbackSet.add(taskCallback);
-            }
-            return clone;
-        }
-
-        Task build() {
-            if (taskRunnable == null) {
-                throw new NullPointerException("taskRunnable is null");
-            }
-            return new Task(this);
-        }
+        void onIntercept(TaskInterceptorChain interceptorChain);
     }
 
+    public interface TaskInterceptorChain {
+        void cancel();
+
+        void proceed();
+    }
 }

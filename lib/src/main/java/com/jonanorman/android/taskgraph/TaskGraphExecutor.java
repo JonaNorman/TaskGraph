@@ -1,9 +1,5 @@
 package com.jonanorman.android.taskgraph;
 
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Trace;
-
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -43,13 +39,10 @@ public class TaskGraphExecutor {
     }
 
 
-    private final Handler mainThreadHandler;
-
     private final ThreadPoolExecutor threadPoolExecutor;
 
 
     public TaskGraphExecutor() {
-        mainThreadHandler = new Handler();
         threadPoolExecutor = new ThreadPoolExecutor(
                 CORE_POOL_SIZE, MAXIMUM_POOL_SIZE, KEEP_ALIVE_SECONDS, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>(), THREAD_FACTORY);
@@ -70,87 +63,55 @@ public class TaskGraphExecutor {
     }
 
 
-    public void execute(TaskGraph.Builder builder) {
-        threadPoolExecutor.execute(new TaskGraphRecord(builder));
+    public void execute(TaskGraph taskGraph) {
+        threadPoolExecutor.execute(new TaskGraphRecord(taskGraph));
     }
 
 
     public class TaskGraphRecord implements Runnable {
 
-        private final TaskGraph taskGraph;
+        private final TaskGraphController taskGraphController;
         private final Set<DirectedGraph.Vertex> pendingTaskSet;
         private final Set<DirectedGraph.Vertex> runningTaskSet;
         private final Object sync = new Object();
         private DirectedGraph directGraph;
         private Set<DirectedGraph.Vertex> vertexSet;
-        private boolean taskEnd;
-        private long startTime;
 
 
-        public TaskGraphRecord(TaskGraph.Builder builder) {
+        public TaskGraphRecord(TaskGraph taskGraph) {
             pendingTaskSet = new HashSet<>();
             runningTaskSet = new HashSet<>();
-            taskGraph = builder.builder();
+            taskGraphController = new TaskGraphController(taskGraph);
         }
 
 
         public void run() {
-            logStart();
             initTaskGraph();
             runStart();
             runNext();
         }
 
-        private void logStart() {
-            startTime = System.currentTimeMillis();
-            TaskGraphModule.logVerbose("taskGraph start...");
-        }
-
-        private void logEnd() {
-            TaskGraphModule.logDebug("taskGraph end " + (System.currentTimeMillis() - startTime) + " ms");
-        }
-
-        private String getCurrentThreadMessage() {
-            StringBuilder stringBuilder = new StringBuilder();
-            if (TaskGraphModule.isMainProcess()) {
-                stringBuilder.append("主进程");
-            } else {
-                stringBuilder.append("进程名:" + TaskGraphModule.getProcessName());
-            }
-            stringBuilder.append(" 线程:" + Thread.currentThread().getName() + " ");
-            return stringBuilder.toString();
-        }
-
 
         private void initTaskGraph() {
-            directGraph = taskGraph.generateDirectedGraph();
-            if (TaskGraphModule.isLogGraphViz()){
-                TaskGraphModule.logInfo("graphviz:\n"+directGraph.getGraphPic());
-            }
+            directGraph = taskGraphController.getDirectedGraph();
             vertexSet = directGraph.getVertexSet();
-            TaskGraphModule.logDebug("taskGraph has " + vertexSet.size()+" task");
             if (directGraph.hasCycle()) {
                 throw new IllegalStateException("graph has cycle\n " + directGraph.getGraphPic());
             }
         }
 
         private void runStart() {
-            taskGraph.runStart();
+            taskGraphController.runStart();
         }
 
         private void runEnd() {
-            taskGraph.runEnd();
+            taskGraphController.runEnd();
         }
 
         private void runNext() {
             synchronized (sync) {
                 if (vertexSet.size() == 0) {
-                    if (taskEnd) {
-                        return;
-                    }
-                    taskEnd = true;
                     runEnd();
-                    logEnd();
                     return;
                 }
                 findPendingTask();
@@ -160,7 +121,7 @@ public class TaskGraphExecutor {
 
 
         private void findPendingTask() {
-            for (DirectedGraph.Vertex<Task> vertex : vertexSet) {
+            for (DirectedGraph.Vertex<TaskController> vertex : vertexSet) {
                 if (directGraph.getInDegree(vertex) == 0) {
                     if (runningTaskSet.add(vertex)) {
                         pendingTaskSet.add(vertex);
@@ -172,41 +133,45 @@ public class TaskGraphExecutor {
         private void runPendingTask() {
             Iterator<DirectedGraph.Vertex> iterator = pendingTaskSet.iterator();
             while (iterator.hasNext()) {
-                final DirectedGraph.Vertex<Task> vertex = iterator.next();
-                Task task = vertex.getValue();
-                task.addTaskCallback(new Task.TaskCallback() {
-
-                    long startTime;
-
-                    @Override
-                    public void doFirst(Task task) {
-                        startTime = System.currentTimeMillis();
-                        if (TaskGraphModule.isEnableTrace()) {
-                            Trace.beginSection(task.getName());
-                        }
-                        TaskGraphModule.logVerbose(getCurrentThreadMessage() + "task:" + task.getName() + " start");
-                    }
-
-                    @Override
-                    public void doLast(Task task) {
-                        if (TaskGraphModule.isEnableTrace()) {
-                            Trace.endSection();
-                        }
-                        TaskGraphModule.logDebug(getCurrentThreadMessage() + "task:" + task.getName() + " end " + (System.currentTimeMillis() - startTime) + "ms");
-                        nextVertex(vertex);
-                    }
-                });
-                if (task.isMainThread()) {
-                    if (Looper.getMainLooper() == Looper.myLooper()) {
-                        task.run();
-                    } else {
-                        mainThreadHandler.post(task);
-                    }
+                if (taskGraphController.isFinished()) {
+                    return;
+                }
+                DirectedGraph.Vertex<TaskController> vertex = iterator.next();
+                TaskController taskController = vertex.getValue();
+                taskController.setControllerEndListener(getNextTaskControllerListener(vertex));
+                Runnable taskRunnable = getTaskRunnable(taskController);
+                if (taskController.mainThread) {
+                    TaskGraphModule.runInMainThread(taskRunnable);
                 } else {
-                    threadPoolExecutor.execute(task);
+                    threadPoolExecutor.execute(taskRunnable);
                 }
                 iterator.remove();
             }
+        }
+
+        private TaskController.TaskControllerEndListener getNextTaskControllerListener(DirectedGraph.Vertex<TaskController> vertex) {
+            TaskController.TaskControllerEndListener endListener = new TaskController.TaskControllerEndListener() {
+                @Override
+                public void onTaskControllerEnd(TaskController controller) {
+                    nextVertex(vertex);
+                }
+            };
+            return endListener;
+        }
+
+        private Runnable getTaskRunnable(TaskController taskController) {
+            Runnable taskRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        taskController.run();
+                    } catch (TaskCancelException e) {
+                        TaskGraphModule.logWarn(e.getMessage());
+                        taskGraphController.runCancel(e);
+                    }
+                }
+            };
+            return taskRunnable;
         }
 
         private void nextVertex(DirectedGraph.Vertex vertex) {

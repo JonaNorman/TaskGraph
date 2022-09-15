@@ -4,11 +4,11 @@
     android:layout_height="match_parent">
 
 
-    <ListView
-        android:id="@+id/listView"
+    <TextView
+        android:text="hello,world"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-    </ListView>
+    </TextView>
 
 </FrameLayout>

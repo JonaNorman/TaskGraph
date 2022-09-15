@@ -39,7 +39,7 @@ class DirectedGraph<V> implements Cloneable {
 
         @Override
         public int hashCode() {
-            return Objects.hash(value);
+            return Objects.hash(value,"Vertex");
         }
 
         @Override
@@ -49,7 +49,7 @@ class DirectedGraph<V> implements Cloneable {
 
 
         @Override
-        protected Object clone() throws CloneNotSupportedException {
+        public Object clone() throws CloneNotSupportedException {
             Vertex clone = (Vertex) super.clone();
             clone.value = value;
             return clone;
@@ -88,12 +88,12 @@ class DirectedGraph<V> implements Cloneable {
 
         @Override
         public String toString() {
-            return "from=" + from + ", to=" + to;
+            return "edge " + from + " -> " + to;
         }
 
 
         @Override
-        protected Object clone() throws CloneNotSupportedException {
+        public Object clone() throws CloneNotSupportedException {
             Edge clone = (Edge) super.clone();
             clone.from = (Vertex) from.clone();
             clone.to = (Vertex) to.clone();
@@ -151,7 +151,6 @@ class DirectedGraph<V> implements Cloneable {
             if (incomingEdges.contains(edge)) {
                 incomingEdges.remove(edge);
             }
-
         }
 
 
@@ -188,7 +187,7 @@ class DirectedGraph<V> implements Cloneable {
 
 
         @Override
-        protected Object clone() throws CloneNotSupportedException {
+        public Object clone() throws CloneNotSupportedException {
             Node clone = (Node) super.clone();
             clone.vertex = (Vertex) vertex.clone();
             clone.incomingEdges = new HashSet();
@@ -386,7 +385,7 @@ class DirectedGraph<V> implements Cloneable {
     }
 
     @Override
-    protected Object clone() throws CloneNotSupportedException {
+    public Object clone() throws CloneNotSupportedException {
         DirectedGraph clone = (DirectedGraph) super.clone();
         clone.graphMap = new HashMap();
         for (Vertex<V> vertex : graphMap.keySet()) {

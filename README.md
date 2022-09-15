@@ -6,10 +6,10 @@
 
 这是一个面向Android开发的依赖任务启动框架，致力于帮助广大Android开发者降低开发成本，它可以使用在启动优化中。
 
-## 引用
+[掘金地址]( https://juejin.cn/post/7143561200016556063/)
+## 接入
 
-[![Maven Central](http://maven-badges.herokuapp.com/maven-central/io.github.jonanorman.android/taskgraph/badge.svg
-)](https://search.maven.org/artifact/io.github.jonanorman.android/taskgraph)
+[![Maven Central](http://maven-badges.herokuapp.com/maven-central/io.github.jonanorman.android/taskgraph/badge.png)](https://search.maven.org/artifact/io.github.jonanorman.android/taskgraph)
 
 ```
 implementation('io.github.jonanorman.android:taskgraph:0.1.0')

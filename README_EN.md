@@ -11,8 +11,7 @@ This is a dependency task startup framework for Android development, dedicated t
 This English document is translated by google, if you don't understand it, you can submit an issue to me.
 ## Import
 
-[![Maven Central](http://maven-badges.herokuapp.com/maven-central/io.github.jonanorman.android/taskgraph/badge.svg
-)](https://search.maven.org/artifact/io.github.jonanorman.android/taskgraph)
+[![Maven Central](http://maven-badges.herokuapp.com/maven-central/io.github.jonanorman.android/taskgraph/badge.png)](https://search.maven.org/artifact/io.github.jonanorman.android/taskgraph)
 
 ```
 implementation('io.github.jonanorman.android:taskgraph:0.1.0')

@@ -19,6 +19,12 @@ implementation('io.github.jonanorman.android:taskgraph:0.1.0')
 ```
 
 ## Use
+
+### Result
+
+![task](./screen/task.gif)
+
+
 ### Init
 It must be executed in onCreate of Application, otherwise TaskGraphModule.getTopActivity() will be wrong
 

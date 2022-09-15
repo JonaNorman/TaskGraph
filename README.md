@@ -16,6 +16,11 @@ implementation('io.github.jonanorman.android:taskgraph:0.1.0')
 ```
 
 ## 使用
+
+### 效果
+
+![task](./screen/task.gif)
+
 ### 初始化
 必须在Application的onCreate中执行，要不然TaskGraphModule.getTopActivity()会错误
 ```Java

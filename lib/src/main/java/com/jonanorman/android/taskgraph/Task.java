@@ -1,5 +1,6 @@
 package com.jonanorman.android.taskgraph;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -16,6 +17,7 @@ public class Task implements Cloneable, Runnable {
     boolean onlyMainProcess;
     String name;
     Runnable runnable;
+    int priority;
 
     public Task() {
         this((String) null);
@@ -35,7 +37,7 @@ public class Task implements Cloneable, Runnable {
 
     public Task(String name, Runnable runnable, boolean mainThread, boolean onlyMainProcess) {
         if (name == null) {
-            name = "Task-" + TASK_INIT_NUMBER.incrementAndGet();
+            name = getClass().getSimpleName() + "-" + TASK_INIT_NUMBER.incrementAndGet();
         }
         this.runnable = runnable;
         this.name = name;
@@ -132,6 +134,13 @@ public class Task implements Cloneable, Runnable {
         return this;
     }
 
+    public Task dependsOn(Collection<Object> names) {
+        for (Object name : names) {
+            dependsSet.add(name);
+        }
+        return this;
+    }
+
     public Task dependsOn(Task... tasks) {
         for (Task task : tasks) {
             dependsSet.add(task);
@@ -169,7 +178,15 @@ public class Task implements Cloneable, Runnable {
 
     @Override
     public String toString() {
-        return "Task " + name + " [mainThread: " + mainThread + "onlyMainProcess: " + onlyMainProcess + "]";
+        return "Task " + name + " [mainThread: " + mainThread + ", onlyMainProcess: " + onlyMainProcess+ ", priority: " + priority + "]";
+    }
+
+    public void setPriority(int priority) {
+        this.priority = priority;
+    }
+
+    public int getPriority() {
+        return priority;
     }
 
     public interface TaskListener {

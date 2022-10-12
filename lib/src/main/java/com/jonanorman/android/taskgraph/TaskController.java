@@ -9,31 +9,34 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-class TaskController implements Task.TaskInterceptorChain {
+class TaskController implements Task.TaskInterceptorChain, Runnable {
 
     final Task task;
     final Set<Task.TaskListener> listenerSet;
     final Queue<Task.TaskInterceptor> taskInterceptorQueue;
     final boolean mainThread;
     final boolean onlyMainProcess;
+    final int priority;
     final String name;
     final Set<Object> dependsOnSet;
     private final TaskGraphController graphController;
     private final Object sync;
-    private boolean cancel;
-    private boolean interrupted;
-    private long startTime;
-    private long costTime;
-    private TaskControllerEndListener controllerEndListener;
-    private Task.TaskInterceptor currentInterceptor;
-    private Task.TaskInterceptor proceedInterceptor;
-
+    private boolean canceled;
+    private long runStartTime;
+    private long runCostTime;
+    private long interceptStartTime;
+    private boolean interceptLogEnable;
+    private TaskControllerListener controllerListener;
+    private volatile Task.TaskInterceptor currentInterceptor;
+    private boolean proceed;
+    private boolean runOver;
 
     TaskController(Task task, TaskGraphController graphController) {
         this.task = task;
         this.graphController = graphController;
         this.sync = new Object();
         this.name = task.name;
+        this.priority = task.priority;
         this.mainThread = task.mainThread;
         this.onlyMainProcess = task.onlyMainProcess;
         this.listenerSet = new HashSet<>();
@@ -45,72 +48,119 @@ class TaskController implements Task.TaskInterceptorChain {
         this.taskInterceptorQueue.add(new RealRunTaskInterceptor());
     }
 
-    final void run() {
-        nextIntercept();
+    public final void run() {
+        interceptStartTime = System.currentTimeMillis();
+        interceptLogEnable = taskInterceptorQueue.size() > 1;
+        if (mainThread) {
+            nextMainThreadIntercept();
+        } else {
+            nextAsyncThreadIntercept();
+        }
+    }
+
+    private void nextMainThreadIntercept() {
+        runNextIntercept();
     }
 
 
-    private void nextIntercept() {
-        synchronized (sync) {
-            currentInterceptor = taskInterceptorQueue.poll();
-            if (currentInterceptor == null) {
-                return;
-            }
-            TaskGraphModule.logVerbose(currentInterceptor +" interrupting");
-            currentInterceptor.onIntercept(this);
-        }
-        while (!graphController.isFinished()) {
+    private void nextAsyncThreadIntercept() {
+        if (!runNextIntercept())
+            return;
+        while (true) {
             synchronized (sync) {
-                if (cancel) {
-                    throw new TaskCancelException(interrupted ?
-                            name + " canceled" + ", because thread interrupted" :
-                            name + " canceled" + ", because " + currentInterceptor + " cancel",
-                            task, interrupted);
-                } else if (currentInterceptor == proceedInterceptor) {
-                    TaskGraphModule.logVerbose(currentInterceptor +" interrupt proceed");
-                    proceedInterceptor = null;
-                    nextIntercept();
+                if (isFinish()) {
+                    return;
+                }
+                if (proceed) {
+                    proceed = false;
+                    nextAsyncThreadIntercept();
                     break;
                 } else {
                     try {
                         sync.wait();
                     } catch (InterruptedException e) {
-                        cancel = true;
-                        interrupted = true;
+                        canceled = true;
+                        if (controllerListener != null) {
+                            controllerListener.onTaskControllerCancel(new TaskCancelException(
+                                    name + " canceled" + ", because thread interrupted",
+                                    task, true));
+                        }
+
                     }
                 }
             }
         }
     }
 
-    private String getCurrentThreadMessage() {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (TaskGraphModule.isMainProcess()) {
-            stringBuilder.append("主进程");
-        } else {
-            stringBuilder.append("进程名:" + TaskGraphModule.getProcessName());
+    private boolean runNextIntercept() {
+        Task.TaskInterceptor interceptor = taskInterceptorQueue.poll();
+        synchronized (sync) {
+            if (isFinish()) {
+                return false;
+            }
+            if (interceptor == null) {
+                runOver = true;
+                return false;
+            }
         }
-        stringBuilder.append(" 线程:" + Thread.currentThread().getName() + " ");
-        return stringBuilder.toString();
+        if (currentInterceptor != null &&!(currentInterceptor instanceof RealRunTaskInterceptor)) {
+            TaskGraphModule.logVerbose(currentInterceptor + " interrupt proceed");
+        }
+        if (!(interceptor instanceof RealRunTaskInterceptor)) {
+            TaskGraphModule.logVerbose(interceptor + " interrupting");
+        }
+
+        currentInterceptor = interceptor;
+        interceptor.onIntercept(this);
+        return true;
     }
 
 
+    private boolean isFinish() {
+        synchronized (sync) {
+            if (runOver || canceled || graphController.isFinished()) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
     @Override
     public String toString() {
-        return  name;
+        return name;
     }
 
     public void cancel() {
         synchronized (sync) {
-            cancel = true;
+            if (isFinish()) {
+                return;
+            }
+            canceled = true;
             sync.notifyAll();
+        }
+        if (controllerListener != null) {
+            controllerListener.onTaskControllerCancel(new TaskCancelException(
+                    name + " canceled" + ", because " + currentInterceptor + " cancel",
+                    task, false));
         }
     }
 
     public void proceed() {
         synchronized (sync) {
-            proceedInterceptor = currentInterceptor;
+            if (isFinish() || proceed) {
+                return;
+            }
+            proceed = true;
             sync.notifyAll();
+        }
+        if (mainThread) {
+            TaskGraphModule.runInMainThread(new Runnable() {
+                @Override
+                public void run() {
+                    nextMainThreadIntercept();
+                }
+            });
         }
     }
 
@@ -118,17 +168,26 @@ class TaskController implements Task.TaskInterceptorChain {
 
         @Override
         public void onIntercept(Task.TaskInterceptorChain interceptorChain) {
+            if (interceptLogEnable) {
+                TaskGraphModule.logDebug(task.getName() + " intercept cost time " + (System.currentTimeMillis() - interceptStartTime));
+            }
             logStart();
+            if (controllerListener != null) {
+                controllerListener.onTaskControllerFist(TaskController.this);
+            }
             for (Task.TaskListener taskCallback : listenerSet) {
                 taskCallback.doFirst(task);
             }
             task.run();
-            logEnd();
             for (Task.TaskListener taskCallback : listenerSet) {
-                taskCallback.doLast(task,costTime, TimeUnit.MILLISECONDS);
+                taskCallback.doLast(task, runCostTime, TimeUnit.MILLISECONDS);
             }
-            if (controllerEndListener != null) {
-                controllerEndListener.onTaskControllerEnd(TaskController.this);
+            logEnd();
+            if (controllerListener != null) {
+                controllerListener.onTaskControllerLast(TaskController.this);
+            }
+            synchronized (sync) {
+                runOver = true;
             }
             interceptorChain.proceed();
         }
@@ -148,27 +207,33 @@ class TaskController implements Task.TaskInterceptorChain {
     }
 
     private void logStart() {
-        startTime = System.currentTimeMillis();
+        runStartTime = System.currentTimeMillis();
         if (TaskGraphModule.isEnableTrace()) {
             Trace.beginSection(name);
         }
-        TaskGraphModule.logVerbose(getCurrentThreadMessage() + "task:" + name + " start");
+        TaskGraphModule.logVerbose("task:" + name + " start");
     }
 
     private void logEnd() {
         if (TaskGraphModule.isEnableTrace()) {
             Trace.endSection();
         }
-        costTime = System.currentTimeMillis() - startTime;
-        TaskGraphModule.logDebug(getCurrentThreadMessage() + "task:" + name + " end " + costTime + "ms");
+        runCostTime = System.currentTimeMillis() - runStartTime;
+        TaskGraphModule.logDebug("task:" + name + " end " + runCostTime + "ms");
     }
 
-    void setControllerEndListener(TaskControllerEndListener controllerEndListener) {
-        this.controllerEndListener = controllerEndListener;
+    void setControllerListener(TaskControllerListener controllerListener) {
+        this.controllerListener = controllerListener;
     }
 
-    interface TaskControllerEndListener {
-        void onTaskControllerEnd(TaskController controller);
+    interface TaskControllerListener {
+
+        void onTaskControllerFist(TaskController taskController);
+
+        void onTaskControllerLast(TaskController taskController);
+
+        void onTaskControllerCancel(TaskCancelException taskCancelException);
+
     }
 
 }

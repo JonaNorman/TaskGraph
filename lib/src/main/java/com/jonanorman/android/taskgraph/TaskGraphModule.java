@@ -107,27 +107,27 @@ public class TaskGraphModule {
 
         @Override
         void verbose(String message) {
-            Log.v(getTag(), message);
+            Log.v(getTag(), getCurrentThreadMessage() + message);
         }
 
         @Override
         void debug(String message) {
-            Log.d(getTag(), message);
+            Log.d(getTag(), getCurrentThreadMessage() + message);
         }
 
         @Override
         void info(String message) {
-            Log.i(getTag(), message);
+            Log.i(getTag(), getCurrentThreadMessage() + message);
         }
 
         @Override
         void warn(String message) {
-            Log.w(getTag(), message);
+            Log.w(getTag(), getCurrentThreadMessage() + message);
         }
 
         @Override
         void error(String message) {
-            Log.e(getTag(), message);
+            Log.e(getTag(), getCurrentThreadMessage() + message);
         }
     };
 
@@ -193,7 +193,7 @@ public class TaskGraphModule {
                 throw new NullPointerException("please first initApplicationContext");
             }
         }
-        return ACTIVITY_DEQUE.getLast();
+        return ACTIVITY_DEQUE.peekLast();
     }
 
     public static void runInMainThread(Runnable runnable) {
@@ -202,6 +202,10 @@ public class TaskGraphModule {
         } else {
             MAIN_HANDLER.post(runnable);
         }
+    }
+
+    public static void postInMainThread(Runnable runnable) {
+        MAIN_HANDLER.post(runnable);
     }
 
     public static boolean isMainThread() {
@@ -241,7 +245,6 @@ public class TaskGraphModule {
         synchronized (LOG_GRAPH_VIZ_SYNC) {
             LOG_GRAPH_VIZ = logGraphViz;
         }
-
     }
 
     public static boolean isLogGraphViz() {
@@ -264,7 +267,7 @@ public class TaskGraphModule {
 
     public static void getRecentActivity(RecentActivityListener recentActivityListener) {
         AtomicBoolean status = new AtomicBoolean();
-        TaskGraphModule.addTopActivityListener(new TaskGraphModule.TopActivityListener() {
+        TaskGraphModule.addTopActivityListener(new TopActivityListener() {
             @Override
             public void onTopActivityShow(Activity activity) {
                 if (!status.getAndSet(true)) {
@@ -308,28 +311,44 @@ public class TaskGraphModule {
     }
 
     public static void logVerbose(String message) {
+        if (LOG_FUNCTION == null) return;
         LOG_FUNCTION.verbose(message);
     }
 
     public static void logDebug(String message) {
+        if (LOG_FUNCTION == null) return;
         LOG_FUNCTION.debug(message);
     }
 
     public static void logInfo(String message) {
+        if (LOG_FUNCTION == null) return;
         LOG_FUNCTION.info(message);
     }
 
     public static void logWarn(String message) {
+        if (LOG_FUNCTION == null) return;
         LOG_FUNCTION.warn(message);
     }
 
     public static void logError(String message) {
+        if (LOG_FUNCTION == null) return;
         LOG_FUNCTION.error(message);
     }
 
     public static void logThrowable(Throwable throwable) {
         if (throwable == null) return;
         logWarn(throwable.getMessage() + "\n" + Log.getStackTraceString(throwable));
+    }
+
+    static String getCurrentThreadMessage() {
+        StringBuilder stringBuilder = new StringBuilder();
+        if (TaskGraphModule.isMainProcess()) {
+            stringBuilder.append("主进程");
+        } else {
+            stringBuilder.append("进程名:" + TaskGraphModule.getProcessName());
+        }
+        stringBuilder.append(" 线程:" + Thread.currentThread().getName() + " ");
+        return stringBuilder.toString();
     }
 
 

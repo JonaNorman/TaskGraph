@@ -12,12 +12,14 @@ import java.util.concurrent.TimeUnit;
 
 class TaskGraphController {
 
-    private final Set<TaskGraph.TaskGraphListener> listenerSet;
+    private final Set<TaskGraph.TaskGraphListener> graphListenerSet;
+    private final Set<Task.TaskListener> taskListenerSet;
     private final Set<TaskController> mainTaskControllerSet;
     private final TaskGraph taskGraph;
     private TaskController firstTaskController;
     private TaskController lastTaskController;
 
+    private boolean mainThread;
     private boolean started;
     private boolean ended;
     private boolean canceled;
@@ -28,8 +30,9 @@ class TaskGraphController {
 
     TaskGraphController(TaskGraph taskGraph) {
         this.taskGraph = taskGraph;
-        this.listenerSet = new HashSet<>();
-        this.listenerSet.addAll(taskGraph.listenerSet);
+        this.mainThread = taskGraph.mainThread;
+        this.graphListenerSet = new HashSet<>(taskGraph.graphListenerSet);
+        this.taskListenerSet = new HashSet<>(taskGraph.taskListenerSet);
         this.mainTaskControllerSet = new HashSet<>();
         if (taskGraph.firstTask != null) {
             TaskController taskController = new TaskController(taskGraph.firstTask, this);
@@ -45,14 +48,15 @@ class TaskGraphController {
         }
         for (Task task : taskGraph.taskSet) {
             TaskController taskController = new TaskController(task, this);
-            if (runInProcess(taskController)) {
+            boolean run = runInProcess(taskController);
+            if (run) {
                 this.mainTaskControllerSet.add(taskController);
             }
         }
     }
 
     private boolean runInProcess(TaskController taskController) {
-        if (!TaskGraphModule.isMainProcess() && taskController.mainThread) {
+        if (!TaskGraphModule.isMainProcess() && taskController.onlyMainProcess) {
             return false;
         }
         return true;
@@ -66,7 +70,7 @@ class TaskGraphController {
             started = true;
         }
         logStart();
-        for (TaskGraph.TaskGraphListener taskGraphCallback : listenerSet) {
+        for (TaskGraph.TaskGraphListener taskGraphCallback : graphListenerSet) {
             taskGraphCallback.onTaskGraphStart(taskGraph);
         }
     }
@@ -79,7 +83,21 @@ class TaskGraphController {
             ended = true;
         }
         logEnd();
-        for (TaskGraph.TaskGraphListener taskGraphCallback : listenerSet) {
+        if (TaskGraphModule.isMainThread()) {
+            TaskGraphExecutor.getDefault().getThreadPoolExecutor().execute(new Runnable() {
+                @Override
+                public void run() {
+                    callTaskGraphEndListener();
+                }
+            });
+        } else {
+            callTaskGraphEndListener();
+        }
+
+    }
+
+    private void callTaskGraphEndListener() {
+        for (TaskGraph.TaskGraphListener taskGraphCallback : graphListenerSet) {
             taskGraphCallback.onTaskGraphEnd(taskGraph, costTime, TimeUnit.MILLISECONDS);
         }
     }
@@ -91,19 +109,46 @@ class TaskGraphController {
             }
             canceled = true;
         }
-        for (TaskGraph.TaskGraphListener taskGraphCallback : listenerSet) {
+        TaskGraphModule.logWarn(taskGraph.name+ cancelException.getMessage());
+        if (TaskGraphModule.isMainThread()) {
+            TaskGraphExecutor.getDefault().getThreadPoolExecutor().execute(new Runnable() {
+                @Override
+                public void run() {
+                    callTaskGraphCancelListener(cancelException);
+                }
+            });
+        } else {
+            callTaskGraphCancelListener(cancelException);
+        }
+    }
+
+    private void callTaskGraphCancelListener(TaskCancelException cancelException) {
+        for (TaskGraph.TaskGraphListener taskGraphCallback : graphListenerSet) {
             taskGraphCallback.onTaskGraphCancel(taskGraph, cancelException);
+        }
+    }
+
+
+    void logTaskStart(Task task) {
+        for (Task.TaskListener taskListener : taskListenerSet) {
+            taskListener.doFirst(task);
+        }
+    }
+
+    void logTaskLast(Task task, long time, TimeUnit timeUnit) {
+        for (Task.TaskListener taskListener : taskListenerSet) {
+            taskListener.doLast(task, time, timeUnit);
         }
     }
 
     private void logStart() {
         startTime = System.currentTimeMillis();
-        TaskGraphModule.logVerbose("taskGraph start...");
+        TaskGraphModule.logVerbose(taskGraph.name + " start...");
     }
 
     private void logEnd() {
         costTime = System.currentTimeMillis() - startTime;
-        TaskGraphModule.logDebug("taskGraph end " + costTime + " ms");
+        TaskGraphModule.logDebug(taskGraph.name+" end " + costTime + " ms");
     }
 
     public boolean isStarted() {
@@ -235,11 +280,13 @@ class TaskGraphController {
             }
         }
         if (TaskGraphModule.isLogGraphViz()) {
-            TaskGraphModule.logInfo("graphviz:\n" + directedGraph.getGraphPic());
+            TaskGraphModule.logInfo(taskGraph.name+" graphviz:\n" + directedGraph.getGraphPic());
         }
-        TaskGraphModule.logDebug("taskGraph get directedGraph " + (System.currentTimeMillis() - startTime) + "ms");
+        TaskGraphModule.logDebug(taskGraph.name+" calculate directedGraph " + (System.currentTimeMillis() - startTime) + "ms");
         return directedGraph;
     }
 
-
+    public boolean isMainThread() {
+        return mainThread;
+    }
 }
